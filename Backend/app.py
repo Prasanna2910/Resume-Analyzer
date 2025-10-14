@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+import re
 from PyPDF2 import PdfReader
 
 app = Flask(__name__)
@@ -10,6 +11,40 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Grouped skills for analysis
+SKILL_CATEGORIES = {
+    "Programming Languages": ["python", "java", "c++", "javascript", "typescript", "go", "c#", "ruby"],
+    "Web Development": ["react", "flask", "django", "express", "html", "css", "node", "angular", "vue"],
+    "Databases": ["sql", "mysql", "mongodb", "postgresql", "redis"],
+    "DevOps & Cloud": ["docker", "kubernetes", "aws", "azure", "ci/cd", "nginx", "jenkins"],
+    "Tools & Platforms": ["git", "github", "vscode", "postman", "linux", "jira"],
+    "AI / ML": ["tensorflow", "scikit-learn", "pytorch", "nlp", "pandas", "numpy"]
+}
+
+# Expanded synonyms / variations
+SYNONYMS = {
+    "javascript": ["js", "java script"],
+    "aws": ["amazon web services"],
+    "node": ["node.js", "nodejs"],
+    "c#": ["c sharp"],
+    "ci/cd": ["ci cd", "continuous integration", "continuous deployment"],
+    "html": ["hypertext markup language"],
+    "css": ["cascading style sheets"],
+    "flask": ["flask framework"],
+    "django": ["django framework"],
+    "react": ["react.js", "reactjs"],
+    "python": ["py"]
+}
+
+def clean_text(text):
+    """Clean PDF text: remove extra spaces, weird chars, normalize common ligatures."""
+    text = text.replace("\ufb01", "fi")  # fix ligature
+    text = re.sub(r'[\n\r]+', ' ', text)  # replace newlines with space
+    text = re.sub(r'\s+', ' ', text)      # remove multiple spaces
+    text = re.sub(r'[•–—]', ' ', text)    # replace bullets/dashes
+    text = re.sub(r'[^\x00-\x7F]+', '', text)  # remove non-ASCII characters
+    return text.lower().strip()
 
 @app.route('/upload', methods=['POST'])
 def upload_resume():
@@ -23,7 +58,6 @@ def upload_resume():
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
     file.save(filepath)
 
-    # ✅ Extract text from PDF
     try:
         reader = PdfReader(filepath)
         extracted_text = ""
@@ -31,25 +65,43 @@ def upload_resume():
         for page in reader.pages:
             extracted_text += page.extract_text() or ""
 
-        if not extracted_text.strip():
+        cleaned_text = clean_text(extracted_text)
+
+        if not cleaned_text:
             return jsonify({"error": "Unable to extract text from PDF"}), 500
 
-        # ✅ Define skills we want to check for
-        TARGET_KEYWORDS = [
-            "python", "flask", "react", "javascript", "node", "sql", 
-            "html", "css", "docker", "aws"
-        ]
+        # Grouped skill matching with synonyms
+        category_matches = {}
+        category_missing = {}
+        total_skills = 0
+        matched_skills_count = 0
 
-        text_lower = extracted_text.lower()
-        matched_keywords = [kw for kw in TARGET_KEYWORDS if kw in text_lower]
-        missing_keywords = [kw for kw in TARGET_KEYWORDS if kw not in matched_keywords]
+        for category, skills in SKILL_CATEGORIES.items():
+            matched = []
+            for skill in skills:
+                # check main skill
+                if skill in cleaned_text:
+                    matched.append(skill)
+                # check synonyms
+                elif skill in SYNONYMS:
+                    for syn in SYNONYMS[skill]:
+                        if syn in cleaned_text:
+                            matched.append(skill)
+                            break
+            missing = [skill for skill in skills if skill not in matched]
+            
+            category_matches[category] = matched
+            category_missing[category] = missing
 
-        score = round((len(matched_keywords) / len(TARGET_KEYWORDS)) * 100, 2)
+            total_skills += len(skills)
+            matched_skills_count += len(matched)
+
+        score = round((matched_skills_count / total_skills) * 100, 2)
 
         return jsonify({
             "skill_match_score": score,
-            "matched": matched_keywords,
-            "missing": missing_keywords,
+            "matched_by_category": category_matches,
+            "missing_by_category": category_missing,
             "preview": extracted_text[:400]  # optional preview
         })
 

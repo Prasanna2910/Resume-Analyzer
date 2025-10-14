@@ -1,51 +1,30 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import ResumeAnalysis from "./components/ResumeAnalysis";
+import "./app.css"
 
 function App() {
-  const [file, setFile] = useState(null);
-  const [response, setResponse] = useState(null);
+  const [result, setResult] = useState(null);
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-  };
-
-  const handleUpload = async () => {
-    if (!file) {
-      alert("Please select a file first.");
-      return;
-    }
+  const handleUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
 
     const formData = new FormData();
     formData.append("resume", file);
 
-    try {
-      const res = await fetch("http://127.0.0.1:5000/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      setResponse(data);
-    } catch (error) {
-      console.error(error);
-      alert("Upload failed!");
-    }
+    const response = await fetch("http://127.0.0.1:5000/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await response.json();
+    setResult(data);
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Resume Analyzer</h1>
-
-      <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload} style={{ marginLeft: "10px" }}>
-        Upload Resume
-      </button>
-
-      {response && (
-        <div style={{ marginTop: "20px" }}>
-          <h3>Analysis Result:</h3>
-          <pre>{JSON.stringify(response, null, 2)}</pre>
-        </div>
-      )}
+    <div className="p-6 max-w-3xl mx-auto">
+      <h1 className="text-3xl font-bold mb-4">Resume Analyzer</h1>
+      <input type="file" onChange={handleUpload} className="mb-6" />
+      {result && <ResumeAnalysis result={result} />}
     </div>
   );
 }
