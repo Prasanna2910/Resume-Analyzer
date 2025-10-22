@@ -25,25 +25,25 @@ export default function ResumeAnalysis({ result }) {
       {Object.keys(matched_by_category).map((category) => (
         <div key={category} className="border p-4 rounded-lg shadow-sm">
           <h3 className="text-xl font-semibold mb-2">{category}</h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="">
             {/* Matched Skills */}
             {matched_by_category[category].map((skill) => (
-              <span
+              <p
                 key={skill}
                 className="px-2 py-1 bg-green-200 text-green-800 rounded-full text-sm"
               >
                 {skill}
-              </span>
+              </p>
             ))}
 
             {/* Missing Skills */}
             {missing_by_category[category].map((skill) => (
-              <span
+              <p
                 key={skill}
                 className="px-2 py-1 bg-red-200 text-red-800 rounded-full text-sm"
               >
                 {skill}
-              </span>
+              </p>
             ))}
           </div>
         </div>
